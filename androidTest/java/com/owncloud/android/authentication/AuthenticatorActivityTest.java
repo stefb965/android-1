@@ -1,8 +1,8 @@
 /**
  *   ownCloud Android client application
  *
-
- *   Copyright (C) 2016 ownCloud GmbH.
+ *   @author Jesus Recio (@jesmrec)
+ *   Copyright (C) 2017 ownCloud GmbH.
  *
  *   This program is free software: you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License version 2,
@@ -20,36 +20,27 @@
 
 package com.owncloud.android.authentication;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.os.Bundle;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.support.test.InstrumentationRegistry;
-import android.support.test.espresso.ViewInteraction;
+import android.support.test.filters.SdkSuppress;
 import android.support.test.rule.ActivityTestRule;
 import android.support.test.runner.AndroidJUnit4;
 import android.support.test.uiautomator.UiDevice;
 import android.test.suitebuilder.annotation.LargeTest;
-import android.support.test.filters.SdkSuppress;
 
-import static android.support.test.espresso.action.ViewActions.pressImeActionButton;
-import static android.support.test.espresso.action.ViewActions.replaceText;
-import static android.support.test.espresso.action.ViewActions.scrollTo;
-import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static android.support.test.espresso.matcher.ViewMatchers.withContentDescription;
-import static android.support.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.Matchers.allOf;
-import static org.junit.Assert.assertTrue;
 import com.owncloud.android.R;
-import com.owncloud.android.utils.AccountsManager;
 import com.owncloud.android.lib.common.utils.Log_OC;
-import com.owncloud.android.authentication.AccountAuthenticator.AuthenticatorException;
+import com.owncloud.android.utils.AccountsManager;
 
-import org.junit.Before;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,20 +49,17 @@ import org.junit.runners.MethodSorters;
 
 import java.lang.reflect.Field;
 
-import android.app.Activity;
-
-import android.util.Log;
-
 import static android.support.test.espresso.Espresso.onView;
 import static android.support.test.espresso.action.ViewActions.click;
 import static android.support.test.espresso.action.ViewActions.closeSoftKeyboard;
-import static android.support.test.espresso.action.ViewActions.typeText;
-
+import static android.support.test.espresso.action.ViewActions.replaceText;
+import static android.support.test.espresso.assertion.ViewAssertions.matches;
+import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static android.support.test.espresso.matcher.ViewMatchers.isEnabled;
 import static android.support.test.espresso.matcher.ViewMatchers.withId;
-
-import static android.support.test.espresso.assertion.ViewAssertions.matches;
+import static android.support.test.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertTrue;
 
 
 @RunWith(AndroidJUnit4.class)
@@ -82,9 +70,9 @@ public class AuthenticatorActivityTest {
     public static final String EXTRA_ACTION = "ACTION";
     public static final String EXTRA_ACCOUNT = "ACCOUNT";
 
-    private static final int WAIT_INITIAL = 500;
-    private static final int WAIT_LOGIN = 4000;
-    private static final int WAIT_CONNECTION = 2000;
+    private static final int WAIT_INITIAL = 500;     //To avoid the short delay when the activity starts
+    private static final int WAIT_LOGIN = 4000;      //Time to wait server response
+    private static final int WAIT_CONNECTION = 2000; //Time to wait until activity finishes (or not)
 
     private static final String ERROR_MESSAGE = "Activity not finished";
     private static final String SUFFIX_BROWSER = "/index.php/apps/files/";
@@ -94,6 +82,7 @@ public class AuthenticatorActivityTest {
 
     private Context targetContext = null;
 
+    /* Parameters from build */
     private String testUser = null;
     private String testUser2 = null;
     private String testPassword = null;
@@ -402,13 +391,38 @@ public class AuthenticatorActivityTest {
     }
 
     /**
+     *  Login with server URL in uppercase
+     */
+    @Test
+    public void test9_check_url_uppercase()
+            throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+
+        Log_OC.i(LOG_TAG, "Test Check URL Uppercase Start");
+
+        String connectionString = getConnectionString(testServerURL, testServerPort);
+
+        connectionString = connectionString.toUpperCase();
+
+        onView(withId(R.id.hostUrlInput))
+                .perform(replaceText(connectionString), closeSoftKeyboard());
+        onView(withId(R.id.account_username)).perform(click());
+
+        SystemClock.sleep(WAIT_CONNECTION);
+
+        onView(withId(R.id.server_status_text)).check(matches(withText(R.string.auth_nossl_plain_ok_title)));
+
+        Log_OC.i(LOG_TAG, "Test Check URL Uppercase Passed");
+
+    }
+
+    /**
      *  Login in https non-secure (self signed or expired certificate).
      *  Certified is not accepted (Negative test).
      *  Only executed in devices with API > 22
      */
     @Test
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.M)
-    public void test9_check_certif_not_secure_no_accept()
+    public void test_10_check_certif_not_secure_no_accept()
             throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 
 
@@ -454,7 +468,7 @@ public class AuthenticatorActivityTest {
      */
     @Test
     @SdkSuppress(minSdkVersion = Build.VERSION_CODES.M)
-    public void test_10_check_certif_not_secure()
+    public void test_11_check_certif_not_secure()
             throws InterruptedException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 
 
@@ -521,7 +535,6 @@ public class AuthenticatorActivityTest {
         }
     }
 
-
     private String getConnectionString (String url, String port){
 
         if (port != null)
@@ -539,6 +552,8 @@ public class AuthenticatorActivityTest {
 
         SystemClock.sleep(WAIT_CONNECTION);
 
+        checkMessageConnection();
+
         // Type user
         onView(withId(R.id.account_username))
                 .perform(replaceText(username), closeSoftKeyboard());
@@ -547,6 +562,14 @@ public class AuthenticatorActivityTest {
         onView(withId(R.id.account_password))
                 .perform(replaceText(password), closeSoftKeyboard());
         onView(withId(R.id.buttonOK)).perform(click());
+    }
+
+    private void checkMessageConnection(){
+        if (trusted == 0) {
+            onView(withId(R.id.server_status_text)).check(matches(withText(R.string.auth_nossl_plain_ok_title)));
+        } else {
+            onView(withId(R.id.server_status_text)).check(matches(withText(R.string.auth_secure_connection)));
+        }
     }
 
     @After
